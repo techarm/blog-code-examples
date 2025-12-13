@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <nav>
+        <a href="/">ホーム</a>
+        <a href="/about">About</a>
+        <a href="/contact">お問い合わせ</a>
+    </nav>
+    <main>
+        {{template "content" .}}
+    </main>
+    <script src="/static/js/main.js"></script>
+</body>
+</html>

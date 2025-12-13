@@ -1,0 +1,18 @@
+{{define "content"}}
+<h1>{{.Title}}</h1>
+<form method="POST" action="/contact">
+    <p>
+        <label>お名前:</label>
+        <input type="text" name="name" required>
+    </p>
+    <p>
+        <label>メールアドレス:</label>
+        <input type="email" name="email" required>
+    </p>
+    <p>
+        <label>メッセージ:</label>
+        <textarea name="message" rows="5" required></textarea>
+    </p>
+    <button type="submit">送信</button>
+</form>
+{{end}}

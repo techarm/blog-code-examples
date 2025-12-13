@@ -1,0 +1,12 @@
+{{define "content"}}
+<h1>{{.Title}}</h1>
+<p>{{.Message}}</p>
+
+{{if .Items}}
+<ul>
+    {{range .Items}}
+    <li>{{.}}</li>
+    {{end}}
+</ul>
+{{end}}
+{{end}}
