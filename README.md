@@ -4,9 +4,10 @@
 
 ## コード一覧
 
-| フォルダ                                             | 記事                                                                                            | 技術         |
-| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------ |
-| [go-web-standard-library](./go-web-standard-library) | [Go 標準ライブラリだけで Web サーバーを作る](https://techarm.dev/posts/go-web-standard-library) | Go, net/http |
+| フォルダ                                             | 記事                                                                                            | 技術                        |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------- | --------------------------- |
+| [go-web-standard-library](./go-web-standard-library) | [Go 標準ライブラリだけで Web サーバーを作る](https://techarm.dev/posts/go-web-standard-library) | Go, net/http                |
+| [go-api-standard-library](./go-api-standard-library) | [Go 標準ライブラリだけで REST API を作る](https://techarm.dev/posts/go-api-standard-library)    | Go, encoding/json, httptest |
 
 ## 使い方
 
