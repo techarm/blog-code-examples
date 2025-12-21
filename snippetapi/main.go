@@ -59,13 +59,13 @@ func createSnippet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		http.Error(w, `{"error":"Invalid JSON"}`, http.StatusBadRequest)
+		respondError(w, http.StatusBadRequest, "Invalid JSON")
 		return
 	}
 
 	// バリデーション
 	if input.Title == "" || input.Code == "" {
-		http.Error(w, `{"error":"title and code are required"}`, http.StatusBadRequest)
+		respondError(w, http.StatusBadRequest, "title and code are required")
 		return
 	}
 
@@ -81,9 +81,7 @@ func createSnippet(w http.ResponseWriter, r *http.Request) {
 	nextID++
 	mu.Unlock()
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(snippet)
+	respondJSON(w, http.StatusCreated, snippet)
 }
 
 func listSnippets(w http.ResponseWriter, r *http.Request) {
@@ -94,15 +92,14 @@ func listSnippets(w http.ResponseWriter, r *http.Request) {
 	}
 	mu.RUnlock()
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(result)
+	respondJSON(w, http.StatusOK, result)
 }
 
 func getSnippet(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, `{"error":"Invalid ID"}`, http.StatusBadRequest)
+		respondError(w, http.StatusBadRequest, "Invalid ID")
 		return
 	}
 
@@ -111,19 +108,18 @@ func getSnippet(w http.ResponseWriter, r *http.Request) {
 	mu.RUnlock()
 
 	if !exists {
-		http.Error(w, `{"error":"Snippet not found"}`, http.StatusNotFound)
+		respondError(w, http.StatusNotFound, "Snippet not found")
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(snippet)
+	respondJSON(w, http.StatusOK, snippet)
 }
 
 func updateSnippet(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, `{"error":"Invalid ID"}`, http.StatusBadRequest)
+		respondError(w, http.StatusBadRequest, "Invalid ID")
 		return
 	}
 
@@ -134,7 +130,7 @@ func updateSnippet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		http.Error(w, `{"error":"Invalid JSON"}`, http.StatusBadRequest)
+		respondError(w, http.StatusBadRequest, "Invalid JSON")
 		return
 	}
 
@@ -142,7 +138,7 @@ func updateSnippet(w http.ResponseWriter, r *http.Request) {
 	snippet, exists := snippets[id]
 	if !exists {
 		mu.Unlock()
-		http.Error(w, `{"error":"Snippet not found"}`, http.StatusNotFound)
+		respondError(w, http.StatusNotFound, "Snippet not found")
 		return
 	}
 
@@ -160,15 +156,14 @@ func updateSnippet(w http.ResponseWriter, r *http.Request) {
 	snippets[id] = snippet
 	mu.Unlock()
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(snippet)
+	respondJSON(w, http.StatusOK, snippet)
 }
 
 func deleteSnippet(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, `{"error":"Invalid ID"}`, http.StatusBadRequest)
+		respondError(w, http.StatusBadRequest, "Invalid ID")
 		return
 	}
 
@@ -176,7 +171,7 @@ func deleteSnippet(w http.ResponseWriter, r *http.Request) {
 	_, exists := snippets[id]
 	if !exists {
 		mu.Unlock()
-		http.Error(w, `{"error":"Snippet not found"}`, http.StatusNotFound)
+		respondError(w, http.StatusNotFound, "Snippet not found")
 		return
 	}
 
@@ -184,4 +179,24 @@ func deleteSnippet(w http.ResponseWriter, r *http.Request) {
 	mu.Unlock()
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// エラーレスポンス用の構造体
+type ErrorResponse struct {
+	Error   string `json:"error"`
+	Message string `json:"message,omitempty"`
+}
+
+// エラーレスポンスを返すヘルパー関数
+func respondError(w http.ResponseWriter, status int, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(ErrorResponse{Error: http.StatusText(status), Message: message})
+}
+
+// JSONレスポンスを返すヘルパー関数
+func respondJSON(w http.ResponseWriter, status int, data any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(data)
 }
