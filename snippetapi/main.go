@@ -17,6 +17,12 @@ type Snippet struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+// エラーレスポンス用の構造体
+type ErrorResponse struct {
+	Error   string `json:"error"`
+	Message string `json:"message,omitempty"`
+}
+
 // インメモリストア
 var (
 	snippets = make(map[int]Snippet)
@@ -46,9 +52,22 @@ func main() {
 	log.Fatal(server.ListenAndServe())
 }
 
-func healthHandler(w http.ResponseWriter, r *http.Request) {
+// エラーレスポンスを返すヘルパー関数
+func respondError(w http.ResponseWriter, status int, message string) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(ErrorResponse{Error: http.StatusText(status), Message: message})
+}
+
+// JSONレスポンスを返すヘルパー関数
+func respondJSON(w http.ResponseWriter, status int, data any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(data)
+}
+
+func healthHandler(w http.ResponseWriter, r *http.Request) {
+	respondJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 func createSnippet(w http.ResponseWriter, r *http.Request) {
@@ -179,24 +198,4 @@ func deleteSnippet(w http.ResponseWriter, r *http.Request) {
 	mu.Unlock()
 
 	w.WriteHeader(http.StatusNoContent)
-}
-
-// エラーレスポンス用の構造体
-type ErrorResponse struct {
-	Error   string `json:"error"`
-	Message string `json:"message,omitempty"`
-}
-
-// エラーレスポンスを返すヘルパー関数
-func respondError(w http.ResponseWriter, status int, message string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(ErrorResponse{Error: http.StatusText(status), Message: message})
-}
-
-// JSONレスポンスを返すヘルパー関数
-func respondJSON(w http.ResponseWriter, status int, data any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
 }
