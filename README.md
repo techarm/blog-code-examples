@@ -8,6 +8,7 @@
 | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------- | --------------------------- |
 | [go-web-standard-library](./go-web-standard-library) | [Go 標準ライブラリだけで Web サーバーを作る](https://techarm.dev/posts/go-web-standard-library) | Go, net/http                |
 | [go-api-standard-library](./go-api-standard-library) | [Go 標準ライブラリだけで REST API を作る](https://techarm.dev/posts/go-api-standard-library)    | Go, encoding/json, httptest |
+| [rust-aws-credential-negative-cache](./rust-aws-credential-negative-cache) | [「認証情報が取れない」が再起動でしか直らない](https://techarm.dev/posts/rust-aws-credential-negative-cache) | Rust, rusoto                |
 
 ## 使い方
 
