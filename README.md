@@ -9,6 +9,7 @@
 | [go-web-standard-library](./go-web-standard-library) | [Go 標準ライブラリだけで Web サーバーを作る](https://techarm.dev/posts/go-web-standard-library) | Go, net/http                |
 | [go-api-standard-library](./go-api-standard-library) | [Go 標準ライブラリだけで REST API を作る](https://techarm.dev/posts/go-api-standard-library)    | Go, encoding/json, httptest |
 | [rust-aws-credential-negative-cache](./rust-aws-credential-negative-cache) | [「認証情報が取れない」が再起動でしか直らない](https://techarm.dev/posts/rust-aws-credential-negative-cache) | Rust, rusoto                |
+| [typesafe-jev](./typesafe-jev) | [Jevは日本語で使えるのか。落ちるのは「データ」ではなく「質問文」だった](https://techarm.dev/posts/typesafe-jev-japanese-latency) | Python, TypeSafe Jev |
 
 ## 使い方
 
