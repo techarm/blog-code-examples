@@ -5,6 +5,8 @@
     python race.py --size 25 --seed 3
     python race.py --laya multilingual
     python race.py --mock               # APIもモデルも使わず見た目だけ確認する
+    python race.py --record frames      # 画面を出さずに、実時間のまま1コマずつPNGで書き出す
+    python race.py --replay frames      # 走り終わってから、手数をそろえて描き直す（frames_to_webp.py で動画にする）
 
 見るべきは実時間ではなく**手数**。Jevは太平洋を往復し、Layaは手元で動くので、
 実時間はネットワークの差をそのまま映す。判断の質が出るのは手数とモデル呼び出し回数。
@@ -97,6 +99,8 @@ class Runner:
         # 指示では「行ったことがない方を選べ」と言っているので、これは規則に反した選択。
         # 画面ではここを赤く囲み、同じ分かれ道に戻ってくるまでの遠回りを赤で描く。
         self.detours: list[dict] = []
+        # 1手ごとの数字。--replay で、手数をそろえて描き直すときに使う
+        self.snapshots: list[dict] = []
         self.thread = threading.Thread(target=self._run, daemon=True)
 
     def start(self) -> None:
@@ -120,6 +124,8 @@ class Runner:
                         self.stats.history.append(d)
                     self.last = d
                     self.stats.wall_ms = (time.perf_counter() - self.started_at) * 1000
+                    self.snapshots.append({"calls": self.stats.calls, "infer_ms": self.stats.infer_ms,
+                                           "wall_ms": self.stats.wall_ms, "last": d})
             with self.lock:
                 self.stats.finished = self.maze.at_goal()
                 self.stats.wall_ms = (time.perf_counter() - self.started_at) * 1000
@@ -152,6 +158,35 @@ class MockPlayer:
         total = sum(p.values())
         p = {k: v / total for k, v in p.items()}
         return players.Decision(pick, p, max(p.values()), self.ms, asked=True)
+
+
+class _MazeAt:
+    """k手目の時点の迷路。歩いた跡を k手目で切るだけで、盤面は元の迷路のもの。"""
+
+    def __init__(self, maze: Maze, k: int) -> None:
+        self.rows, self.cols, self.grid = maze.rows, maze.cols, maze.grid
+        self.start, self.goal = maze.start, maze.goal
+        self.trail = maze.trail[: k + 1]
+        self.pos = self.trail[-1]
+
+
+class _RunnerAt:
+    """k手目の時点の走者。draw_panel が読む属性だけを持つ。"""
+
+    def __init__(self, runner: Runner, k: int) -> None:
+        k = min(k, runner.stats.moves)
+        self.player, self.limit, self.error = runner.player, runner.limit, None
+        self.lock = threading.Lock()
+        self.maze = _MazeAt(runner.maze, k)
+        self.detours = [d for d in runner.detours if d["start"] < k]
+        self.stats = players.Stats()
+        self.stats.moves = k
+        self.last = None
+        if k:
+            snap = runner.snapshots[k - 1]
+            self.stats.calls, self.stats.infer_ms = snap["calls"], snap["infer_ms"]
+            self.stats.wall_ms, self.last = snap["wall_ms"], snap["last"]
+        self.stats.finished = runner.stats.finished and k == runner.stats.moves
 
 
 # ---------------------------------------------------------------- 描画
@@ -315,6 +350,44 @@ def draw_winner(surf, w, h, text: str) -> None:
     surf.blit(box, (rect.x + pad, rect.y + pad // 2))
 
 
+def draw_frame(screen, W, H, rects, left, right, maze, seed, shortest) -> list:
+    screen.fill(BG)
+    draw_header(screen, W, maze, seed, shortest)
+    draw_panel(screen, rects[0], left, JEV, JEV_SOFT, shortest)
+    draw_panel(screen, rects[1], right, LAYA, LAYA_SOFT, shortest)
+
+    a, b = left.stats, right.stats
+    over = [r for r in (left, right) if r.stats.finished or r.stats.moves >= r.limit]
+    if len(over) == 2:
+        if a.finished and b.finished:
+            if a.moves != b.moves:
+                w = left if a.moves < b.moves else right
+                draw_winner(screen, W, H,
+                            f"手数で {w.player.name} の勝ち　{min(a.moves, b.moves)} 対 {max(a.moves, b.moves)}")
+            else:
+                draw_winner(screen, W, H, f"手数は同じ　{a.moves} 手")
+        elif a.finished or b.finished:
+            w = left if a.finished else right
+            draw_winner(screen, W, H, f"{w.player.name} だけがゴール　{w.stats.moves} 手")
+        else:
+            draw_winner(screen, W, H, "どちらも未到達")
+    return over
+
+
+def replay(screen, W, H, rects, left, right, maze, seed, shortest, out: str, per: int) -> None:
+    """走り終わった2人を、同じ手数ずつ進めて描き直す。
+
+    実時間だと、Layaは1秒かからずにゴールしてしまい、どう歩いたかが見えない。
+    ここで見せたいのは手数と遠回りなので、手数をそろえる。
+    """
+    end = max(left.stats.moves, right.stats.moves)
+    ks = list(range(0, end, per)) + [end]
+    for i, k in enumerate(ks):
+        draw_frame(screen, W, H, rects, _RunnerAt(left, k), _RunnerAt(right, k), maze, seed, shortest)
+        pygame.image.save(screen, os.path.join(out, f"{i:05d}.png"))
+    print(f"{out} に {len(ks)} コマ書き出しました（1コマ {per} 手）")
+
+
 # ---------------------------------------------------------------- 本体
 
 
@@ -332,10 +405,18 @@ def main() -> None:
     ap.add_argument("--mock", action="store_true", help="APIもモデルも使わない")
     ap.add_argument("--shot", help="このPNGに書き出して終了（表示なし）")
     ap.add_argument("--shot-after", type=float, default=3.0, help="書き出しまでの秒数")
+    ap.add_argument("--record", help="このフォルダに1コマずつPNGで書き出す（表示なし）")
+    ap.add_argument("--fps", type=float, default=10, help="--record のコマ数（毎秒）")
+    ap.add_argument("--replay", help="走り終わってから、手数をそろえてこのフォルダにPNGで描き直す（表示なし）")
+    ap.add_argument("--moves-per-frame", type=int, default=4, help="--replay の1コマで進める手数")
+    ap.add_argument("--hold", type=float, default=0.5, help="--record で、両方終わってから撮り続ける秒数")
     args = ap.parse_args()
 
-    if args.shot:
+    if args.shot or args.record or args.replay:
         os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+    for d in (args.record, args.replay):
+        if d:
+            os.makedirs(d, exist_ok=True)
 
     pygame.init()
     W, H = 1480, 940
@@ -366,33 +447,33 @@ def main() -> None:
 
     running = True
     t0 = time.perf_counter()
+    # 実時間のまま撮る。Layaが先に着いてJevがまだ歩いている、という差もそのまま映す
+    frame, next_frame, ended_at = 0, 0.0, None
     while running:
         for ev in pygame.event.get():
             if ev.type == pygame.QUIT or (ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE):
                 running = False
 
-        screen.fill(BG)
-        draw_header(screen, W, left_maze, args.seed, shortest)
-        draw_panel(screen, rects[0], left, JEV, JEV_SOFT, shortest)
-        draw_panel(screen, rects[1], right, LAYA, LAYA_SOFT, shortest)
-
-        a, b = left.stats, right.stats
-        over = [r for r in (left, right) if r.stats.finished or r.stats.moves >= r.limit]
-        if len(over) == 2:
-            if a.finished and b.finished:
-                if a.moves != b.moves:
-                    w = left if a.moves < b.moves else right
-                    draw_winner(screen, W, H,
-                                f"手数で {w.player.name} の勝ち　{min(a.moves, b.moves)} 対 {max(a.moves, b.moves)}")
-                else:
-                    draw_winner(screen, W, H, f"手数は同じ　{a.moves} 手")
-            elif a.finished or b.finished:
-                w = left if a.finished else right
-                draw_winner(screen, W, H, f"{w.player.name} だけがゴール　{w.stats.moves} 手")
-            else:
-                draw_winner(screen, W, H, "どちらも未到達")
-
+        over = draw_frame(screen, W, H, rects, left, right, left_maze, args.seed, shortest)
         pygame.display.flip()
+
+        if args.replay:
+            if len(over) == 2:
+                running = False
+            clock.tick(30)
+            continue
+
+        if args.record:
+            now = time.perf_counter() - t0
+            if now >= next_frame:
+                pygame.image.save(screen, os.path.join(args.record, f"{frame:05d}.png"))
+                frame += 1
+                next_frame += 1 / args.fps
+            if len(over) == 2:
+                ended_at = ended_at if ended_at is not None else now
+                if now - ended_at >= args.hold:
+                    print(f"{args.record} に {frame} コマ書き出しました")
+                    running = False
 
         if args.shot and time.perf_counter() - t0 >= args.shot_after:
             pygame.image.save(screen, args.shot)
@@ -400,6 +481,10 @@ def main() -> None:
             running = False
 
         clock.tick(30)
+
+    if args.replay:
+        replay(screen, W, H, rects, left, right, left_maze, args.seed, shortest,
+               args.replay, args.moves_per_frame)
 
     for p in (p1, p2):
         p.close()

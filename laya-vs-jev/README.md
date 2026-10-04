@@ -27,6 +27,7 @@ export TYPESAFE_API_KEY=あなたのキー   # Jev を使うスクリプトだ�
 | laya-mlx（非公式） | 0.2.0 |
 | typesafe-sdk | 0.7.2（モデルは `jev-1.13.0`） |
 | pygame | 2.6.1 |
+| Pillow | 12.3.0（動画にまとめるときだけ） |
 
 ## 記事の数字を再現する
 
@@ -69,6 +70,17 @@ python snake.py --shot out.png --shot-after 20   # 画面を出さずに画像�
 python snake.py --backend torch     # Laya を本家（PyTorch）で動かす。既定は MLX版
 ```
 
+記事の動画は、走り終わってから同じ手数ずつ（1コマ4手）描き直したものです。
+実際の時間のままだと、Layaは1秒かからずにゴールしてしまい、どう歩いたかが見えないためです。
+
+```bash
+python race.py --replay frames                  # 走らせて、1コマずつPNGで書き出す（画面は出さない）
+python frames_to_webp.py frames race.webp --fps 12
+python race.py --record frames                  # こちらは実時間のまま撮る
+```
+
+Jevの手数は走るたびに変わります（2026年10月4日に8回走らせて、328手・384手・432手）。記事の動画は384手の回です。
+
 迷路の画面で、Laya側に出る赤い丸は「まだ行っていない道があるのに、もう通った道を選んだ分かれ道」、
 赤い線は「そこから同じ分かれ道に戻ってくるまでの遠回り」です。
 
@@ -80,6 +92,7 @@ python snake.py --backend torch     # Laya を本家（PyTorch）で動かす。
 | `players.py` | 迷路で Jev と Laya に同じ材料・同じ質問を渡す層 |
 | `snake_core.py` | Snakeの盤面と、モデルに渡す材料・質問 |
 | `ui.py` | 2つのアプリで共有する見た目（色・フォント・部品） |
+| `frames_to_webp.py` | `race.py --replay` / `--record` で書き出したPNGを、アニメーションWebPにまとめる |
 
 材料と質問文の書き方は、実測して決めました。なぜその書き方にしたかは、各ファイルのコメントに書いてあります。
 
